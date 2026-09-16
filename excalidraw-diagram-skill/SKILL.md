@@ -11,7 +11,7 @@ Generate `.excalidraw` JSON files that **argue visually**, not just display info
 
 ## Customization
 
-**`references/diagram-standard.md` is mandatory reading** — it carries the house
+**`references/diagram-standard.md` is mandatory reading.** It carries the house
 rules (card anatomy, type scale, separators, colour meaning, legend contents, arrows, grid)
 that every diagram this skill produces follows, plus the Excalidraw mechanics that bite.
 

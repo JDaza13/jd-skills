@@ -29,12 +29,12 @@ here is all it takes to re-skin every diagram this skill produces.
 | Neutral shape (UI surface, wire, note)   | `#ffffff` | `#94a3b8` |
 | Grouping bar (service layer)             | `#f1f5f9` | `#64748b` |
 | Light boundary (client-side, secondary)  | `#dbeafe` | `#2563eb` |
-| **Primary boundary (anchor)**            | `#1e293b` | `#1e293b` — white text |
+| **Primary boundary (anchor)**            | `#1e293b` | `#1e293b` (white text) |
 | External / upstream system               | `#fafafa` | `#94a3b8` |
 | Lane outline (dashed)                    | none      | `#cbd5e1` |
 
 The solid dark fill is the diagram's single strongest value. Reserve it for the one
-element the diagram is arguing about — the thing everything else exists to explain.
+element the diagram is arguing about, the thing everything else exists to explain.
 
 ## Semantic accents
 
@@ -76,5 +76,5 @@ also draws dependency lines.
 - **Fill/stroke pairing.** Every pair is a light fill (~L92%) with a dark stroke (~L30-45%).
   When extending, match those levels or the new hue will read as a different weight.
 - Excalidraw curves multi-point arrows unless `roundness` is `null`, and it lays an arrow's
-  bound label out at the path midpoint regardless of stored coordinates — use free-floating
+  bound label out at the path midpoint regardless of stored coordinates. Use free-floating
   text when a routed line needs a label in a specific spot.

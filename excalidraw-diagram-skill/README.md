@@ -24,7 +24,7 @@ cp -r jd-skills/excalidraw-diagram-skill .claude/skills/excalidraw-diagram
 
 ## Setup
 
-The skill includes a render pipeline that lets the agent visually validate its diagrams. Pick whichever runtime you already have — you only need one.
+The skill includes a render pipeline that lets the agent visually validate its diagrams. Pick whichever runtime you already have. You only need one.
 
 **Option A: Ask your coding agent (easiest)**
 
@@ -76,7 +76,7 @@ Edit `references/color-palette.md` to match your brand. Everything else in the s
 excalidraw-diagram-skill/
   SKILL.md                          # Design methodology + workflow
   references/
-    color-palette.md                # Brand colors (edit this to customize) — neutral default out of the box
+    color-palette.md                # Brand colors (edit this to customize), ships with a neutral default
     diagram-standard.md             # House rules for a consistent set of diagrams
     element-templates.md            # JSON templates for each element type
     json-schema.md                  # Excalidraw JSON format reference

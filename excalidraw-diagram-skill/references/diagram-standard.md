@@ -16,10 +16,10 @@ inside a bound label, so a single element cannot make its first line stand out.
 | Part  | How                                                                           |
 | ----- | ----------------------------------------------------------------------------- |
 | Title | Its own text element, +2px over body size, in the card's **stroke** colour    |
-| Body  | Its own text element, body size, in `#334155` — or `#ffffff` on the dark fill |
+| Body  | Its own text element, body size, in `#334155`, or `#ffffff` on the dark fill |
 
 **Never let the title come out lighter than the body.** On a card whose stroke is a light
-grey (`#94a3b8`, `#64748b` — neutral cards, upstream systems, the service bar) the stroke
+grey (`#94a3b8`, `#64748b`: neutral cards, upstream systems, the service bar) the stroke
 colour inverts the hierarchy, so the title takes `#1e293b` instead.
 
 Title, body and rectangle share a `groupIds` entry so the card drags as one unit. Do **not**
@@ -95,7 +95,7 @@ colour at all.
 
 **The legend defines every colour that appears.** Not just the interesting ones. If a
 diagram uses a dark fill, light blue, green, teal, violet, rose, amber, grey and red, the legend
-has nine entries. Distinguish shades explicitly — "dark fill = primary boundary" and "light blue =
+has nine entries. Distinguish shades explicitly. "Dark fill = primary boundary" and "light blue =
 client-side component" are two entries, never one entry called "blue".
 
 The one that gets forgotten is the **neutral**, because white does not feel like a choice.
