@@ -1,0 +1,10 @@
+{
+  "name": "excalidraw-diagram-skill-renderer",
+  "version": "1.0.0",
+  "description": "Playwright-based renderer for .excalidraw JSON files, used by the excalidraw-diagram-skill.",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "playwright-core": "^1.63.0"
+  }
+}
