@@ -93,24 +93,34 @@ Values come from [color-palette.md](color-palette.md). Two rules on top of it:
 nothing else in that diagram is blue. A colour reused for a second meaning is worse than no
 colour at all.
 
-**The legend defines every colour that appears.** Not just the interesting ones. If a
-diagram uses a dark fill, light blue, green, teal, violet, rose, amber, grey and red, the legend
-has nine entries. Distinguish shades explicitly. "Dark fill = primary boundary" and "light blue =
-client-side component" are two entries, never one entry called "blue".
+**Ask before adding a legend.** A legend is not automatic. Before generating JSON, ask the
+user whether they want one for this diagram. Default to no legend for a simple diagram with
+two or three colours where the meaning is obvious from labels alone; lean toward yes for a
+diagram with five or more distinct hues, or where the same shape appears in different colours
+for different reasons.
 
-The one that gets forgotten is the **neutral**, because white does not feel like a choice.
-It usually covers more cards than any accent in the drawing, so it needs an entry at least as
-much as the hue used twice.
+**If the user wants a legend, every colour that appears needs an entry**, not just the
+interesting ones. If a diagram uses a dark fill, light blue, green, teal, violet, rose, amber,
+grey and red, the legend has nine entries. Distinguish shades explicitly. "Dark fill = primary
+boundary" and "light blue = client-side component" are two entries, never one entry called
+"blue". The one that gets forgotten is the **neutral**, because white does not feel like a
+choice; it usually covers more cards than any accent in the drawing, so it needs an entry too.
+
+**A legend entry is a swatch plus a label, never a label alone.** "Blue: existing merge
+detect" written in plain text makes the reader guess which blue. Use the Legend Entry
+template in `element-templates.md`: a small filled rectangle in the exact fill/stroke pair
+being explained, followed by free-floating text. The reader should see the colour, not read
+its name.
 
 ## 5. Dashed strokes
 
-Dashed carries two distinct meanings and the legend must name both:
+Dashed carries two distinct meanings, and a legend (when one exists) must name both:
 
-| Dashed on | Means                                                         |
-| --------- | ------------------------------------------------------------- |
-| An arrow  | A dependency or a conditional path, not the primary flow      |
-| A box     | An annotation — a note, a caveat, a gap. **Not a component.** |
-| A lane    | A grouping boundary, which is why lanes use a 1px `#cbd5e1`   |
+| Dashed on | Means                                                       |
+| --------- | ------------------------------------------------------------ |
+| An arrow  | A dependency or a conditional path, not the primary flow    |
+| A box     | An annotation, a note, a caveat, a gap. **Not a component.** |
+| A lane    | A grouping boundary, which is why lanes use a 1px `#cbd5e1` |
 
 ## 6. Arrows
 
@@ -149,6 +159,24 @@ Dashed carries two distinct meanings and the legend must name both:
   both dropped from the card's centre x overlap for their whole shared run. Leave the centre
   to the primary flow and drop the dependency from a quarter point.
 
+### Diamonds and other non-rectangular sources
+
+The rules above assume a rectangle, where "generated from the box edges" is unambiguous.
+A diamond only has four real connection points: its top, right, bottom and left vertices.
+
+- **A two-way branch exits from the left and right vertices**, not the bottom. An arrow
+  leaving from a point along the diamond's sloped edge (the equivalent of a rectangle's
+  edge midpoint) starts outside the visible shape and reads as floating.
+- **Bump `gap` to 8-12 for a diamond binding**, instead of the usual `gap: 2`. Excalidraw's
+  `startBinding`/`endBinding` hit-test uses the diamond's bounding box, not its visible
+  outline, so the default gap leaves a visible sliver of space between the arrowhead and
+  the diamond on render. Confirm by rendering and cropping to the diamond, see the Render
+  & Validate section in `SKILL.md`.
+- **Label the branch, don't guess it.** "Yes" and "no" (or whatever the two paths mean) are
+  free-floating text next to each arrow, not folded into the diamond's own label.
+- Ellipses bind the same way as diamonds: hit-test on the bounding box, not the curve, so
+  the same `gap: 8-12` rule applies.
+
 ## 7. Rails, rows and lanes
 
 - Every row gets a left-rail label at `x = -300`, vertically centred on the row — including
@@ -158,10 +186,22 @@ Dashed carries two distinct meanings and the legend must name both:
   story (`Domain events → Enrichment → Adapters → Destinations`).
 - A lane groups cards that share a caveat (`Outside the event bus — these never call track()`).
 
-## 8. Grid
+## 8. Grid and margins
 
 Columns are 420 wide on a 460 pitch; full-width bars span the whole column set. Connected
-rows sit 40px apart. Keep the spacing when adding a row — it is what makes the arrows uniform.
+rows sit 40px apart. Keep the spacing when adding a row, it is what makes the arrows uniform.
+
+**Check the whole canvas's outer margin, not just individual containers.** The title, the
+subtitle and the legend (when there is one) sit at the edges of the diagram, so they are
+the elements most likely to run past the canvas boundary rather than into a neighbour.
+A text element's stored `width` is authored by hand, not measured from the actual glyphs,
+so an underestimate (a common failure on long titles) lets the rendered text overflow past
+where the JSON says the diagram ends. The renderer now expands the canvas automatically
+when it detects this and prints a warning (see `SKILL.md`'s Render & Validate section), but
+treat that warning as a bug to fix in the source JSON, not a feature to rely on: a canvas
+that keeps growing to absorb bad width estimates throws off the balance the Grid section
+above depends on. Leave at least 40px of clear margin between the title/subtitle/legend
+and the canvas edge, and re-render after resizing to confirm the fix actually landed.
 
 ## 9. Excalidraw mechanics worth knowing
 
@@ -181,18 +221,28 @@ rows sit 40px apart. Keep the spacing when adding a row — it is what makes the
 2. Card titles are separate elements, +2px, in the stroke colour
 3. No space-padded columns anywhere
 4. Separators are `·` / `—` / `→`, used for one job each
-5. Every colour in the drawing has a legend entry, shades distinguished
-6. Dashed boxes and dashed arrows are both explained in the legend
-7. All arrows are strokeWidth 2 with the same arrowhead
-8. Every row, bars included, has a rail label
-9. Connected rows are 40px apart, fan-out gutters 60px; arrows generated from box edges
-10. Every arrow ends in a 28px segment, and no multi-point arrow kept its `roundness`
-11. No card has dead space under its last line
-12. Rendered to PNG and actually looked at
+5. Asked the user whether they want a legend, before generating JSON
+6. If a legend exists: every colour in the drawing has an entry, shades distinguished, and
+   each entry is a colour swatch plus a label, not text alone
+7. Dashed boxes and dashed arrows are both explained wherever colour meaning is explained
+8. All arrows are strokeWidth 2 with the same arrowhead
+9. Every row, bars included, has a rail label
+10. Connected rows are 40px apart, fan-out gutters 60px; arrows generated from box edges
+    (or, for a diamond, from its vertices)
+11. Every arrow ends in a 28px segment, and no multi-point arrow kept its `roundness`
+12. No card has dead space under its last line
+13. Rendered to PNG and actually looked at, one section at a time as it was built
+14. Every diamond and ellipse cropped and inspected close up, not just seen in the full-diagram render
+15. Title, subtitle and legend checked against the canvas edge, no render-time overflow warning left unresolved
 
-Item 12 is the one that finds things. Several rules here — arrowhead size, a reversed end
+Item 13 is the one that finds things. Several rules here — arrowhead size, a reversed end
 tangent, a dependency crossing a card, two arrows sharing a run — are **derived** at render
 time and are invisible in the JSON. An audit that reads stored properties will report a clean
 drawing while the PNG shows the defect: `strokeWidth: 2` on every arrow says nothing about
 whether the heads match. Measure what the renderer measures, then crop the PNG and look at
 the spots the measurement flagged.
+
+Items 14 and 15 exist because a full-diagram render at reduced scale hides small-scale
+defects. A few pixels of text bleeding past an ellipse's curve, or a title's last character
+touching the canvas edge, are easy to miss when the whole diagram is scaled down to fit on
+screen. Cropping to the actual region at full resolution is what catches them.

@@ -185,6 +185,8 @@ Before anything else, determine if this needs to be:
 
 **If comprehensive**: Do research first. Look up actual specs, formats, event names, APIs.
 
+**Also ask now**: does this diagram need a colour legend? See **Color as Meaning** below for how to decide. Settle this before Step 5, since it changes how many colours you plan to use.
+
 ### Step 1: Understand Deeply
 
 Read the content. For each concept, ask:
@@ -238,9 +240,10 @@ After generating the JSON, you MUST run the render-view-fix loop until the diagr
 
 1. **Create the base file** with the JSON wrapper (`type`, `version`, `appState`, `files`) and the first section of elements.
 2. **Add one section per edit.** Each section gets its own dedicated pass — take your time with it. Think carefully about the layout, spacing, and how this section connects to what's already there.
-3. **Use descriptive string IDs** (e.g., `"trigger_rect"`, `"arrow_fan_left"`) so cross-section references are readable.
-4. **Namespace seeds by section** (e.g., section 1 uses 100xxx, section 2 uses 200xxx) to avoid collisions.
-5. **Update cross-section bindings** as you go. When a new section's element needs to bind to an element from a previous section (e.g., an arrow connecting sections), edit the earlier element's `boundElements` array at the same time.
+3. **Render and view this section before starting the next one.** Run the render script (see Render & Validate below) and read the PNG. Do not wait until every section exists to look at any of them: a bad size or position compounds once later sections are placed relative to it, and a diamond or ellipse's geometry problems are much easier to catch in isolation than buried in a full diagram. If this section contains a diamond or ellipse, crop and inspect it now, not later.
+4. **Use descriptive string IDs** (e.g., `"trigger_rect"`, `"arrow_fan_left"`) so cross-section references are readable.
+5. **Namespace seeds by section** (e.g., section 1 uses 100xxx, section 2 uses 200xxx) to avoid collisions.
+6. **Update cross-section bindings** as you go. When a new section's element needs to bind to an element from a previous section (e.g., an arrow connecting sections), edit the earlier element's `boundElements` array at the same time.
 
 **Phase 2: Review the whole**
 
@@ -252,9 +255,9 @@ After all sections are in place, read through the complete JSON and check:
 
 Fix any alignment or binding issues before rendering.
 
-**Phase 3: Render & validate**
+**Phase 3: Render & validate the whole diagram**
 
-Now run the render-view-fix loop from the Render & Validate section. This is where you'll catch visual issues that aren't obvious from JSON — overlaps, clipping, imbalanced composition.
+Each section was already rendered and viewed on its own in Phase 1. This pass is different: run the render-view-fix loop from the Render & Validate section on the *complete* diagram, looking specifically for problems that only show up once every section is present, such as cross-section overlaps, uneven whitespace between sections, or a legend that no longer accounts for a colour introduced later.
 
 ### Section Boundaries
 
@@ -384,6 +387,13 @@ Choose shape based on what it represents—or use no shape at all:
 
 **Rule**: Default to no container. Add shapes only when they carry meaning. Aim for <30% of text elements to be inside containers.
 
+**An ellipse holds one short line of text, never a title-plus-body card.** Its curved
+edges shrink the usable interior on all four sides, so the card pattern that works in a
+rectangle (see `diagram-standard.md` §1) overflows in an ellipse. If a start/end node needs
+a real card, use a rectangle and carry the "start/end" meaning through colour instead of
+shape. See the Diamond and Labeled Ellipse templates in `references/element-templates.md`
+for the sizing formulas both shapes actually need.
+
 ---
 
 ## Color as Meaning
@@ -398,6 +408,8 @@ Colors encode information, not decoration. Every color choice should come from `
 - Always pair a darker stroke with a lighter fill for contrast
 
 **Do not invent new colors.** If a concept doesn't fit an existing semantic category, use Primary/Neutral or Secondary.
+
+**A legend is optional. Ask before adding one.** Before generating JSON, ask the user whether they want a colour legend for this diagram. A simple diagram with two or three colours whose meaning is obvious from the labels doesn't need one; a diagram with five or more distinct hues, or the same shape reused in different colours for different reasons, usually does. If the user wants one, see `references/diagram-standard.md` §4: every colour needs an entry, and each entry is a colour swatch plus a label, never a label alone. The Legend Entry template in `references/element-templates.md` has the swatch + text pair.
 
 ---
 
@@ -514,6 +526,18 @@ cd .claude/skills/excalidraw-diagram/references && uv run python render_excalidr
 
 This outputs a PNG next to the `.excalidraw` file. Then use the **Read tool** on the PNG to actually view it.
 
+**If the renderer prints a `WARNING: content extends past declared bounds` line**, an element's stored `width` (almost always a title or other free-floating text) is smaller than what actually rendered. The renderer expands the canvas so nothing gets clipped in the PNG you're about to view, but go fix the source element's `width` anyway. See `references/diagram-standard.md` §8.
+
+### Cropping a region (diamonds, ellipses, or anything you need a close look at)
+
+Both render scripts take `--crop-element <id>[,<id>...]` to produce a tight, high-resolution crop around one or more elements instead of the whole diagram, plus `--crop-margin <px>` (default 40) to control the padding around them:
+
+```bash
+node .claude/skills/excalidraw-diagram/references/render_excalidraw.mjs <path-to-file.excalidraw> --crop-element gate_diamond --output gate_diamond_crop.png
+```
+
+**Every diamond and every ellipse in the diagram is a mandatory crop target.** A full-diagram render, especially one scaled down to fit a column of chat, hides small-scale defects: a few pixels of text bleeding past a curved edge reads as fine at a glance and wrong up close. Crop each one and Read the cropped PNG before calling the diagram, or the section containing it, done.
+
 ### The Loop
 
 After generating the initial JSON, run this cycle:
@@ -539,6 +563,9 @@ After generating the initial JSON, run this cycle:
 - Sections with too much whitespace next to sections that are too cramped
 - Text too small to read at the rendered size
 - Overall composition feels lopsided or unbalanced
+- The title, subtitle, or legend running close to or past the canvas edge
+
+**3b. Crop and inspect every diamond and ellipse.** Run `--crop-element` on each one (see above) and Read the result. Look specifically for text touching or crossing the shape's curved or angled edge, and for arrows that visibly start or end away from the shape's outline.
 
 **4. Fix** — Edit the JSON to address everything you found. Common fixes:
 
@@ -558,6 +585,8 @@ The loop is done when:
 
 - The rendered diagram matches the conceptual design from your planning steps
 - No text is clipped, overlapping, or unreadable
+- Every diamond and ellipse has been cropped and inspected close up, not just seen at full-diagram scale
+- No unresolved `WARNING: content extends past declared bounds` from the renderer
 - Arrows route cleanly and connect to the right elements
 - Spacing is consistent and the composition is balanced
 - You'd be comfortable showing it to someone without caveats
@@ -613,10 +642,13 @@ uv run playwright install chromium
 
 ### Visual Validation (Render Required)
 
-21. **Rendered to PNG**: Diagram has been rendered and visually inspected
+21. **Rendered to PNG**: Diagram has been rendered and visually inspected, one section at a time as it was built
 22. **No text overflow**: All text fits within its container
 23. **No overlapping elements**: Shapes and text don't overlap unintentionally
 24. **Even spacing**: Similar elements have consistent spacing
 25. **Arrows land correctly**: Arrows connect to intended elements without crossing others
 26. **Readable at export size**: Text is legible in the rendered PNG
 27. **Balanced composition**: No large empty voids or overcrowded regions
+28. **Diamonds and ellipses cropped**: Every one has been cropped with `--crop-element` and inspected close up
+29. **No unresolved overflow warning**: The renderer's `WARNING: content extends past declared bounds` (if it ever printed one) has been fixed at the source, not just papered over by the auto-expanded canvas
+30. **Legend decided, not assumed**: The user was asked whether they want a legend, and if they said yes, every entry is a colour swatch plus a label

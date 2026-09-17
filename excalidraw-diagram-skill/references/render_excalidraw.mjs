@@ -6,7 +6,7 @@
  * Playwright. Prefer this one here; no setup step is needed.
  *
  * Usage:
- *   node .claude/skills/excalidraw-diagram/references/render_excalidraw.mjs <file.excalidraw> [--output path.png] [--scale 2] [--width 1920]
+ *   node .claude/skills/excalidraw-diagram/references/render_excalidraw.mjs <file.excalidraw> [--output path.png] [--scale 2] [--width 1920] [--crop-element id1,id2] [--crop-margin 40]
  */
 
 import { readFileSync } from 'node:fs';
@@ -31,6 +31,9 @@ if (!inputPath) {
 const outputPath = flag('output', inputPath.replace(/\.excalidraw$/, '') + '.png');
 const scale = Number(flag('scale', 2));
 const maxWidth = Number(flag('width', 1920));
+const cropElementArg = flag('crop-element', null);
+const cropElementIds = cropElementArg ? cropElementArg.split(',').map((id) => id.trim()) : null;
+const cropMargin = Number(flag('crop-margin', 40));
 
 const data = JSON.parse(readFileSync(inputPath, 'utf8'));
 if (data.type !== 'excalidraw') {
@@ -79,11 +82,17 @@ const page = await browser.newPage({
 await page.goto(pathToFileURL(templatePath).href);
 await page.waitForFunction('window.__moduleReady === true', undefined, { timeout: 60000 });
 
-const result = await page.evaluate((diagram) => window.renderDiagram(diagram), data);
+const result = await page.evaluate(
+  ({ diagram, options }) => window.renderDiagram(diagram, options),
+  { diagram: data, options: { cropElementIds, cropMargin } },
+);
 if (!result?.success) {
   console.error(`ERROR: render failed: ${result?.error ?? 'renderDiagram returned null'}`);
   await browser.close();
   process.exit(1);
+}
+if (result.warning) {
+  console.error(`WARNING: ${result.warning}`);
 }
 
 await page.waitForFunction('window.__renderComplete === true', undefined, { timeout: 15000 });

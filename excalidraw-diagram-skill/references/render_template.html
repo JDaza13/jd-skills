@@ -27,10 +27,35 @@
       // Pinned: the unpinned specifier resolves a dependency chain that 404s on esm.sh.
       import { exportToSvg } from 'https://esm.sh/@excalidraw/excalidraw@0.18.0?bundle';
 
-      window.renderDiagram = async function (jsonData) {
+      /** Bounding box across a set of elements, in the diagram's own coordinate space. Mirrors the logic in render_excalidraw.py / .mjs. */
+      function computeBounds(elements) {
+        let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+        for (const el of elements) {
+          if (el.isDeleted) continue;
+          const { x = 0, y = 0, width = 0, height = 0, type, points } = el;
+          if ((type === 'arrow' || type === 'line') && points) {
+            for (const [px, py] of points) {
+              minX = Math.min(minX, x + px);
+              minY = Math.min(minY, y + py);
+              maxX = Math.max(maxX, x + px);
+              maxY = Math.max(maxY, y + py);
+            }
+            continue;
+          }
+          minX = Math.min(minX, x);
+          minY = Math.min(minY, y);
+          maxX = Math.max(maxX, x + Math.abs(width));
+          maxY = Math.max(maxY, y + Math.abs(height));
+        }
+        if (minX === Infinity) return { minX: 0, minY: 0, maxX: 800, maxY: 600 };
+        return { minX, minY, maxX, maxY };
+      }
+
+      window.renderDiagram = async function (jsonData, options) {
+        options = options || {};
         try {
           const data = typeof jsonData === 'string' ? JSON.parse(jsonData) : jsonData;
-          const elements = data.elements || [];
+          const elements = (data.elements || []).filter((el) => !el.isDeleted);
           const appState = data.appState || {};
           const files = data.files || {};
 
@@ -47,14 +72,90 @@
             files: files,
           });
 
+          const declaredWidth = parseFloat(svg.getAttribute('width')) || 0;
+          const declaredHeight = parseFloat(svg.getAttribute('height')) || 0;
+
           // Clear any previous render
           const root = document.getElementById('root');
           root.innerHTML = '';
           root.appendChild(svg);
 
+          // Wait for web fonts to finish loading before measuring anything. Text first
+          // paints with a fallback font and reflows once the real one is ready; measuring
+          // before that swap under-reports the true glyph width and the overflow fix below
+          // would resize to a still-too-small canvas.
+          if (document.fonts && document.fonts.ready) {
+            await document.fonts.ready;
+          }
+
+          // getBBox() reports the ACTUAL rendered geometry (real glyph widths included),
+          // regardless of what an element's authored `width`/`height` claimed. An agent-
+          // guessed text width that undershoots the real glyphs would otherwise clip
+          // silently at the SVG's own boundary, since exportToSvg sizes the canvas from
+          // the elements' stored dimensions, not from what actually renders.
+          const bbox = svg.getBBox();
+          const overflowLeft = Math.max(0, -bbox.x);
+          const overflowTop = Math.max(0, -bbox.y);
+          const overflowRight = Math.max(0, (bbox.x + bbox.width) - declaredWidth);
+          const overflowBottom = Math.max(0, (bbox.y + bbox.height) - declaredHeight);
+
+          let warning = null;
+          if (overflowLeft > 1 || overflowTop > 1 || overflowRight > 1 || overflowBottom > 1) {
+            const dx = Math.round(Math.max(overflowLeft, overflowRight));
+            const dy = Math.round(Math.max(overflowTop, overflowBottom));
+            warning = `content extends past declared bounds by ~${dx}px horizontally and ~${dy}px vertically. ` +
+              `This usually means a text element's stored "width" is smaller than its actual rendered text ` +
+              `(a hand-guessed title width is the most common cause). The canvas has been expanded so nothing ` +
+              `is clipped in this PNG, but fix the source element's width in the .excalidraw JSON.`;
+
+            const minX = -overflowLeft;
+            const minY = -overflowTop;
+            const width = declaredWidth + overflowLeft + overflowRight;
+            const height = declaredHeight + overflowTop + overflowBottom;
+            svg.setAttribute('viewBox', `${minX} ${minY} ${width} ${height}`);
+            svg.setAttribute('width', width);
+            svg.setAttribute('height', height);
+          }
+
+          // Optional crop to one or more elements by id, e.g. to inspect a single
+          // diamond or ellipse at full resolution instead of the whole diagram.
+          if (options.cropElementIds && options.cropElementIds.length > 0) {
+            const wanted = new Set(options.cropElementIds);
+            const targets = elements.filter((el) => wanted.has(el.id));
+            const missing = options.cropElementIds.filter((id) => !elements.some((el) => el.id === id));
+            if (targets.length === 0) {
+              window.__renderComplete = true;
+              window.__renderError = `--crop-element: no matching element id(s): ${options.cropElementIds.join(', ')}`;
+              return { success: false, error: window.__renderError };
+            }
+
+            // The SVG's own coordinate space is offset from the diagram's authored
+            // x/y coordinates (exportToSvg adds its own padding/origin). Derive that
+            // offset empirically: compute the full diagram's bounds the same way we
+            // just measured the SVG's real bbox, then diff the two.
+            const docBoundsAll = computeBounds(elements);
+            const offsetX = bbox.x - docBoundsAll.minX;
+            const offsetY = bbox.y - docBoundsAll.minY;
+
+            const docBoundsTarget = computeBounds(targets);
+            const margin = typeof options.cropMargin === 'number' ? options.cropMargin : 40;
+            const cropMinX = docBoundsTarget.minX + offsetX - margin;
+            const cropMinY = docBoundsTarget.minY + offsetY - margin;
+            const cropWidth = (docBoundsTarget.maxX - docBoundsTarget.minX) + margin * 2;
+            const cropHeight = (docBoundsTarget.maxY - docBoundsTarget.minY) + margin * 2;
+
+            svg.setAttribute('viewBox', `${cropMinX} ${cropMinY} ${cropWidth} ${cropHeight}`);
+            svg.setAttribute('width', cropWidth);
+            svg.setAttribute('height', cropHeight);
+
+            if (missing.length > 0) {
+              warning = `${warning ? warning + ' ' : ''}--crop-element id(s) not found and skipped: ${missing.join(', ')}.`;
+            }
+          }
+
           window.__renderComplete = true;
           window.__renderError = null;
-          return { success: true, width: svg.getAttribute('width'), height: svg.getAttribute('height') };
+          return { success: true, width: svg.getAttribute('width'), height: svg.getAttribute('height'), warning };
         } catch (err) {
           window.__renderComplete = true;
           window.__renderError = err.message;

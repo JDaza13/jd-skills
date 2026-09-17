@@ -2,7 +2,7 @@
 
 Usage:
     cd .claude/skills/excalidraw-diagram/references
-    uv run python render_excalidraw.py <path-to-file.excalidraw> [--output path.png] [--scale 2] [--width 1920]
+    uv run python render_excalidraw.py <path-to-file.excalidraw> [--output path.png] [--scale 2] [--width 1920] [--crop-element id1,id2] [--crop-margin 40]
 
 First-time setup:
     cd .claude/skills/excalidraw-diagram/references
@@ -74,6 +74,8 @@ def render(
     output_path: Path | None = None,
     scale: int = 2,
     max_width: int = 1920,
+    crop_element_ids: list[str] | None = None,
+    crop_margin: int = 40,
 ) -> Path:
     """Render an .excalidraw file to PNG. Returns the output PNG path."""
     # Import playwright here so validation errors show before import errors
@@ -143,15 +145,25 @@ def render(
         # Wait for the ES module to load (imports from esm.sh)
         page.wait_for_function("window.__moduleReady === true", timeout=30000)
 
-        # Inject the diagram data and render
-        json_str = json.dumps(data)
-        result = page.evaluate(f"window.renderDiagram({json_str})")
+        # Inject the diagram data and render. Passed as a single payload (rather than
+        # interpolated into the JS string) so Playwright handles the JSON encoding.
+        payload = {
+            "diagram": data,
+            "options": {"cropElementIds": crop_element_ids, "cropMargin": crop_margin},
+        }
+        result = page.evaluate(
+            "(payload) => window.renderDiagram(payload.diagram, payload.options)",
+            payload,
+        )
 
         if not result or not result.get("success"):
             error_msg = result.get("error", "Unknown render error") if result else "renderDiagram returned null"
             print(f"ERROR: Render failed: {error_msg}", file=sys.stderr)
             browser.close()
             sys.exit(1)
+
+        if result.get("warning"):
+            print(f"WARNING: {result['warning']}", file=sys.stderr)
 
         # Wait for render completion signal
         page.wait_for_function("window.__renderComplete === true", timeout=15000)
@@ -175,13 +187,17 @@ def main() -> None:
     parser.add_argument("--output", "-o", type=Path, default=None, help="Output PNG path (default: same name with .png)")
     parser.add_argument("--scale", "-s", type=int, default=2, help="Device scale factor (default: 2)")
     parser.add_argument("--width", "-w", type=int, default=1920, help="Max viewport width (default: 1920)")
+    parser.add_argument("--crop-element", type=str, default=None, help="Comma-separated element id(s) to crop tightly around, instead of rendering the whole diagram")
+    parser.add_argument("--crop-margin", type=int, default=40, help="Padding in px around --crop-element (default: 40)")
     args = parser.parse_args()
 
     if not args.input.exists():
         print(f"ERROR: File not found: {args.input}", file=sys.stderr)
         sys.exit(1)
 
-    png_path = render(args.input, args.output, args.scale, args.width)
+    crop_element_ids = [i.strip() for i in args.crop_element.split(",")] if args.crop_element else None
+
+    png_path = render(args.input, args.output, args.scale, args.width, crop_element_ids, args.crop_margin)
     print(str(png_path))
 
 
